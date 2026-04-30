@@ -1,0 +1,1 @@
+{"version":3,"sources":["css/tabs/privacy_policy.less"],"names":[],"mappings":"AAAA,mBACC;AADD,mBACI;AADJ,mBACQ;AADR,mBACY;AADZ,mBACgB;EACd,mBAAA;;AAFF,mBAIC;EACC,6BAAA","sourcesContent":[".tab-privacy_policy {\r\n\tp, h1, h2, h3, h4 {\r\n\t\tmargin-bottom: 10px;\r\n\t}\r\n\tli {\r\n\t\tmargin-bottom: 0px !important;\r\n\t}\r\n}\r\n"],"file":"privacy_policy.css"}

@@ -1,0 +1,223 @@
+.tab-firmware_flasher .build-options-wrapper .select2-container {
+  width: calc(100% - 30px) !important;
+}
+.tab-firmware_flasher .build-options-wrapper .helpicon {
+  margin-top: 8px;
+}
+.tab-firmware_flasher .info {
+  padding: 2px 18px;
+  position: relative;
+  flex-grow: 100;
+}
+.tab-firmware_flasher .info .progressLabel {
+  position: absolute;
+  width: calc(100% - 36px);
+  height: 26px;
+  top: 2px;
+  left: 0;
+  text-align: center;
+  line-height: 24px;
+  color: white;
+  font-weight: bold;
+  margin-left: 18px;
+}
+.tab-firmware_flasher .info .progressLabel a {
+  color: white;
+}
+.tab-firmware_flasher .info .progressLabel a:hover {
+  text-decoration: underline;
+}
+.tab-firmware_flasher .info .progressLabel.valid {
+  background-color: #00d000;
+  border-radius: 5px;
+}
+.tab-firmware_flasher .info .progressLabel.invalid {
+  background-color: #A62E32;
+  border-radius: 5px;
+}
+.tab-firmware_flasher .info .progressLabel.actionRequired {
+  background-color: #0081FF;
+  border-radius: 5px;
+}
+.tab-firmware_flasher .info .progress {
+  width: 100%;
+  height: 26px;
+  border-radius: 5px;
+  border: 1px solid var(--subtleAccent);
+  -webkit-appearance: none;
+}
+.tab-firmware_flasher .info .progress::-webkit-progress-bar {
+  background-color: #4f4f4f;
+  border-radius: 4px;
+  box-shadow: inset 0px 0px 5px #2f2f2f;
+}
+.tab-firmware_flasher .info .progress::-webkit-progress-value {
+  background-color: #F86008;
+  border-radius: 4px;
+}
+.tab-firmware_flasher .spacer_box_title {
+  float: none;
+}
+.tab-firmware_flasher ul li {
+  list-style: initial;
+  list-style-type: circle;
+  margin-left: 30px;
+}
+.tab-firmware_flasher .options {
+  position: relative;
+  margin-bottom: 10px;
+  line-height: 18px;
+  text-align: left;
+}
+.tab-firmware_flasher .options label input {
+  float: left;
+  margin-top: 2px;
+}
+.tab-firmware_flasher .options label span {
+  font-weight: bold;
+  margin-left: 6px;
+}
+.tab-firmware_flasher .options select {
+  width: 300px;
+  height: 20px;
+  border: 1px solid var(--subtleAccent);
+  border-radius: 3px;
+}
+.tab-firmware_flasher .options select option.cached {
+  font-weight: bold;
+}
+.tab-firmware_flasher .options .releases select {
+  width: 280px;
+}
+.tab-firmware_flasher .options .description {
+  position: relative;
+  left: 0px;
+  font-style: italic;
+  color: #818181;
+}
+.tab-firmware_flasher .options .flash_on_connect_wrapper {
+  display: none;
+}
+.tab-firmware_flasher .options .manual_baud_rate select {
+  width: 75px;
+  margin-left: 19px;
+}
+.tab-firmware_flasher td.board-description {
+  padding: 1px 0 3px 0;
+}
+.tab-firmware_flasher .helpicon {
+  margin-top: 3px;
+}
+.tab-firmware_flasher .option.releases {
+  margin: 0 0 2px 0;
+  line-height: 20px;
+}
+.tab-firmware_flasher .cf_table td:last-child {
+  text-align: left;
+  padding-left: 8px;
+}
+.tab-firmware_flasher .build_configuration .select2-selection__choice {
+  margin: auto;
+  color: #3f4241;
+}
+.tab-firmware_flasher .build_configuration input {
+  border: solid 1px var(--subtleAccent);
+  border-radius: 3px;
+  min-height: 20px;
+  padding: 2px 4px 2px 4px;
+}
+.tab-firmware_flasher .release_info,
+.tab-firmware_flasher .build_configuration {
+  display: none;
+}
+.tab-firmware_flasher .release_info .title,
+.tab-firmware_flasher .build_configuration .title {
+  line-height: 20px;
+  text-align: center;
+  font-weight: bold;
+  color: white;
+  border-bottom: 1px solid var(--subtleAccent);
+  background-color: #3f4241;
+}
+.tab-firmware_flasher .release_info .target,
+.tab-firmware_flasher .build_configuration .target {
+  color: blue;
+}
+.tab-firmware_flasher .release_info p,
+.tab-firmware_flasher .build_configuration p {
+  padding: 5px;
+}
+.tab-firmware_flasher .release_info p a,
+.tab-firmware_flasher .build_configuration p a {
+  font-weight: bold;
+}
+.tab-firmware_flasher .release_info p a:hover,
+.tab-firmware_flasher .build_configuration p a:hover {
+  text-decoration: underline;
+}
+.tab-firmware_flasher .default_btn {
+  margin: 1px 7px 0 0;
+  width: fit-content;
+}
+.tab-firmware_flasher .default_btn a {
+  padding: 0 4px 2px 4px;
+  font-size: 11px;
+}
+.tab-firmware_flasher .board_support {
+  float: right;
+}
+.tab-firmware_flasher .build_configuration_toggle_wrapper {
+  float: left;
+  position: absolute;
+  padding-left: 15px;
+  padding-top: 4px;
+}
+.btn .disabled {
+  cursor: default;
+  color: #fff;
+  background-color: #AFAFAF;
+  border: 1px solid #AFAFAF;
+  pointer-events: none;
+  text-shadow: none;
+  opacity: 0.5;
+}
+#dialogUnstableFirmwareAcknowledgement .content {
+  margin-top: 10px;
+}
+#dialogUnstableFirmwareAcknowledgement .content div {
+  margin-bottom: 10px;
+}
+#dialogUnstableFirmwareAcknowledgement .content ul {
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+#branchInfo .select2-selection__rendered,
+#radioProtocolInfo .select2-selection__rendered,
+#telemetryProtocolInfo .select2-selection__rendered,
+#motorProtocolInfo .select2-selection__rendered {
+  line-height: 30px !important;
+}
+#branchInfo .select2-container .select2-selection--single,
+#radioProtocolInfo .select2-container .select2-selection--single,
+#telemetryProtocolInfo .select2-container .select2-selection--single,
+#motorProtocolInfo .select2-container .select2-selection--single {
+  height: 32px !important;
+}
+#branchInfo .select2-selection__arrow,
+#radioProtocolInfo .select2-selection__arrow,
+#telemetryProtocolInfo .select2-selection__arrow,
+#motorProtocolInfo .select2-selection__arrow {
+  height: 32px !important;
+  width: 32px;
+}
+#customDefines {
+  width: calc(100% - 40px);
+  height: 26px;
+}
+#build_configuration_toggle_label_text {
+  margin-left: 6px;
+  padding-top: 2px;
+  margin-right: 10px;
+}
+
+/*# sourceMappingURL=firmware_flasher.css.map */
