@@ -9317,7 +9317,8 @@ function abortConnection() {
  * when serial events are handled.
  */
 function read_serial_adapter(event) {
-    read_serial(event.detail.buffer);
+    const data = event.detail?.buffer ?? event.detail;
+    read_serial({ data: data });
 }
 
 function onOpen(openInfo) {
@@ -13962,5 +13963,5 @@ function startProcess() {
 window.isExpertModeEnabled = isExpertModeEnabled;
 window.appReady = appReady;
 
-export { BuildApi as B, CliAutoComplete as C, DarkTheme as D, EscProtocols as E, Features as F, GUI as G, MspHelper as M, PortHandler$1 as P, TABS as T, UI_PHONES as U, VtxDeviceTypes as V, checkSetupAnalytics as a, serial$3 as b, checkForConfiguratorUpdates as c, MSP$1 as d, MSPCodes as e, PortUsage as f, get as g, set as h, sensor_status as i, update_dataflash_global as j, Beepers as k, reinitializeConnection as l, mspHelper as m, have_sensor as n, isExpertModeEnabled as o, updateTabList as p, showErrorDialog as q, read_serial as r, setDarkTheme as s, tracking as t, usbDevices as u };
+export { BuildApi as B, CliAutoComplete as C, DarkTheme as D, EscProtocols as E, Features as F, GUI as G, MspHelper as M, PortHandler$1 as P, TABS as T, UI_PHONES as U, VtxDeviceTypes as V, checkSetupAnalytics as a, serial$3 as b, checkForConfiguratorUpdates as c, MSP$1 as d, MSPCodes as e, PortUsage as f, get as g, set as h, sensor_status as i, update_dataflash_global as j, Beepers as k, reinitializeConnection as l, mspHelper as m, have_sensor as n, isExpertModeEnabled as o, updateTabList as p, showErrorDialog as q, read_serial as r, setDarkTheme as s, tracking as t, usbDevices as u, serial$1 as serialAdapter };
 //# sourceMappingURL=main.js.map

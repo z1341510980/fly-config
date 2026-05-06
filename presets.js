@@ -1,5 +1,5 @@
 import './window_watchers.js';
-import { b as serial, G as GUI, l as reinitializeConnection, T as TABS, U as UI_PHONES } from './js/main.js';
+import { serialAdapter as serial, G as GUI, l as reinitializeConnection, T as TABS, U as UI_PHONES } from './js/main.js';
 import { g as get, s as set, i as i18n } from './localization.js';
 import { g as generateFilename } from './generate_filename.js';
 import { C as CONFIGURATOR, F as FC } from './common.js';
@@ -332,7 +332,7 @@ class CliEngine
             Windows understands (both) CRLF
             Chrome OS currently unknown
         */
-        const data = new Uint8Array(readInfo.data);
+        const data = new Uint8Array(readInfo.data ?? readInfo);
         let validateText = "";
         let sequenceCharsToSkip = 0;
         for (const charCode of data) {

@@ -1,7 +1,7 @@
 import { i as i18n } from './localization.js';
 import { C as Clipboard } from './Clipboard.js';
 import { g as generateFilename } from './generate_filename.js';
-import { G as GUI, T as TABS, C as CliAutoComplete, t as tracking, b as serial, U as UI_PHONES, l as reinitializeConnection, B as BuildApi } from './js/main.js';
+import { G as GUI, T as TABS, C as CliAutoComplete, t as tracking, serialAdapter as serial, U as UI_PHONES, l as reinitializeConnection, B as BuildApi } from './js/main.js';
 import { C as CONFIGURATOR, c as checkChromeRuntimeError } from './common.js';
 import { g as gui_log } from './gui_log.js';
 import { j as jBox } from './jbox.js';
@@ -470,7 +470,7 @@ cli.read = function (readInfo) {
         Windows understands (both) CRLF
         Chrome OS currently unknown
     */
-    const data = new Uint8Array(readInfo.data);
+    const data = new Uint8Array(readInfo.data ?? readInfo);
     let validateText = "";
     let sequenceCharsToSkip = 0;
 

@@ -13,10 +13,6 @@ const requiredRuntimeFiles = [
     'tabs/motors.html',
     'components/MotorOutputReordering/Body.html',
     'components/EscDshotDirection/Body.html',
-    'locales/en/messages.json',
-    'resources/models/quad_x.json',
-    'resources/motor_order/custom.svg',
-    'resources/osd/1/default.mcm',
     'images/light-wide-2.svg',
     'images/icons/cf_icon_position.png',
     'webfonts/fa-solid-900.woff2',
@@ -29,7 +25,7 @@ afterAll(() => {
 
 describe('production build output', () => {
     it(
-        'copies legacy runtime-loaded assets into the deployable dist folder',
+        'copies the pure web runtime assets into the deployable dist folder',
         async () => {
             await build({
                 root: repoRoot,
