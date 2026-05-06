@@ -38,11 +38,14 @@ describe('browser web entry', () => {
         expect(portInitialize).toContain('this.initializeWebSerial();');
     });
 
-    it('gives WebSerial a stable connection identity and preserves baudRate', () => {
+    it('gives WebSerial a stable browser-port identity and preserves baudRate', () => {
         const mainJs = readProjectFile('js/main.js');
 
         expect(mainJs).toContain("this.connectionType = 'serial';");
-        expect(mainJs).toContain("connectionInfo.connectionId || 'webserial'");
+        expect(mainJs).toContain('this.portPaths = new WeakMap();');
+        expect(mainJs).toContain('this.nextPortId = 1;');
+        expect(mainJs).toContain('this.portPaths.set(port, `serial_${vendorId}_${productId}_${this.nextPortId++}`);');
+        expect(mainJs).toContain('connectionId: requestedPath');
         expect(mainJs).toContain('this.bitrate = options.baudRate;');
         expect(mainJs).toContain('new CustomEvent("connect", { detail: this.connectionInfo })');
     });

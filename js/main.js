@@ -1614,29 +1614,52 @@ PortHandler.initializeWebSerial = function () {
     this.dfu_available = false;
     this.showVirtualMode = get$1('showVirtualMode').showVirtualMode;
 
+    const self = this;
     const webSerialSupported = typeof navigator !== 'undefined' && 'serial' in navigator;
     const webUsbSupported = typeof navigator !== 'undefined' && 'usb' in navigator;
-    const webPorts = [{
-        path: 'webserial',
-        displayName: webSerialSupported ? 'Web Serial' : 'Web Serial unavailable - use HTTPS in Chrome or Edge',
-    }];
-
-    if (webUsbSupported) {
-        webPorts.push({
-            path: 'DFU',
-            displayName: 'WebUSB DFU',
-            isDFU: true,
-            isWebUsb: true,
-        });
-    }
-
-    this.updatePortSelect(webPorts);
-    this.portPickerElement.val('webserial').trigger('change');
-    this.initialPorts = webPorts;
     this.port_available = webSerialSupported;
 
+    const refreshPorts = async function() {
+        const serialPorts = webSerialSupported ? await serialWeb.getDevices() : [];
+        const ports = [...serialPorts];
+
+        if (webUsbSupported) {
+            const usbDevicesFound = await self.getAuthorizedDfuDevices();
+            self.dfu_available = usbDevicesFound.length > 0;
+            ports.push({
+                path: 'DFU',
+                displayName: 'WebUSB DFU',
+                isDFU: true,
+                isWebUsb: true,
+            });
+        }
+
+        if (!ports.length && webSerialSupported) {
+            ports.push({
+                path: 'requestpermission-serial',
+                displayName: 'Request serial access',
+            });
+        }
+
+        self.updatePortSelect(ports);
+        self.initialPorts = ports;
+
+        const currentValue = self.portPickerElement.val();
+        if (currentValue && self.portPickerElement.children(`[value="${currentValue}"]`).length) {
+            self.portPickerElement.val(currentValue);
+        } else if (ports.length) {
+            self.portPickerElement.val(ports[0].path);
+        }
+
+        self.portPickerElement.trigger('change');
+    };
+
+    serialWeb.addEventListener("addedDevice", refreshPorts);
+    serialWeb.addEventListener("removedDevice", refreshPorts);
+
+    refreshPorts();
+
     if (webUsbSupported) {
-        const self = this;
         const pollUsbDevices = function() {
             self.check_usb_devices();
             self.usbCheckLoop = setTimeout(pollUsbDevices, TIMEOUT_CHECK);
@@ -1735,20 +1758,21 @@ PortHandler.check_usb_devices = function (callback) {
         chrome.usb.getDevices(usbDevices, function (result) {
             const selectedPath = self.portPickerElement.val();
             const hasMatchingDfuDevice = result.length > 0;
-            const webSerialPort = {
-                path: 'webserial',
-                displayName: typeof navigator !== 'undefined' && 'serial' in navigator
-                    ? 'Web Serial'
-                    : 'Web Serial unavailable - use HTTPS in Chrome or Edge',
-            };
-            const ports = [webSerialPort, {
+            const serialPorts = serialWeb.ports ? [...serialWeb.ports] : [];
+            const ports = [...serialPorts];
+            ports.push({
                 path: 'DFU',
-                displayName: hasMatchingDfuDevice
-                    ? `DFU - ${result[0].productName || 'WebUSB Device'}`
-                    : 'WebUSB DFU',
+                displayName: 'WebUSB DFU',
                 isDFU: true,
                 isWebUsb: true,
-            }];
+            });
+
+            if (!ports.length && (typeof navigator !== 'undefined' && 'serial' in navigator)) {
+                ports.push({
+                    path: 'requestpermission-serial',
+                    displayName: 'Request serial access',
+                });
+            }
 
             self.updatePortSelect(ports);
             self.initialPorts = ports;
@@ -1756,8 +1780,8 @@ PortHandler.check_usb_devices = function (callback) {
 
             if (selectedPath && self.portPickerElement.children(`[value="${selectedPath}"]`).length) {
                 self.portPickerElement.val(selectedPath);
-            } else {
-                self.portPickerElement.val('webserial');
+            } else if (ports.length) {
+                self.portPickerElement.val(ports[0].path);
             }
 
             if (callback) {
@@ -2650,6 +2674,7 @@ class WebSerial extends EventTarget {
         this.connected = false;
         this.openRequested = false;
         this.openCanceled = false;
+        this.closeRequested = false;
         this.transmitting = false;
         this.connectionInfo = null;
 
@@ -2661,7 +2686,10 @@ class WebSerial extends EventTarget {
 
         this.logHead = "SERIAL: ";
 
+        this.ports = [];
         this.port = null;
+        this.portPaths = new WeakMap();
+        this.nextPortId = 1;
         this.reader = null;
         this.writer = null;
         this.reading = false;
@@ -2679,6 +2707,19 @@ class WebSerial extends EventTarget {
         };
 
         this.connect = this.connect.bind(this);
+        this.disconnect = this.disconnect.bind(this);
+        this.handleDisconnect = this.handleDisconnect.bind(this);
+        this.handleReceiveBytes = this.handleReceiveBytes.bind(this);
+
+        if (!navigator?.serial) {
+            console.error(`${this.logHead} Web Serial API not supported`);
+            return;
+        }
+
+        navigator.serial.addEventListener("connect", event => this.handleNewDevice(event.target));
+        navigator.serial.addEventListener("disconnect", event => this.handleRemovedDevice(event.target));
+
+        this.loadDevices();
     }
 
     toLegacyReadInfo(detail) {
@@ -2734,14 +2775,91 @@ class WebSerial extends EventTarget {
         this.bytesReceived += info.detail.byteLength;
     }
 
+    handleNewDevice(device) {
+        const addedPort = this.createPort(device);
+        if (!this.ports.some(port => port.port === device)) {
+            this.ports.push(addedPort);
+        }
+        this.dispatchEvent(new CustomEvent("addedDevice", { detail: addedPort }));
+        return addedPort;
+    }
+
+    handleRemovedDevice(device) {
+        const removedPort = this.ports.find(port => port.port === device);
+        this.ports = this.ports.filter(port => port.port !== device);
+        this.dispatchEvent(new CustomEvent("removedDevice", { detail: removedPort || this.createPort(device) }));
+
+        if (this.port === device) {
+            this.disconnect();
+        }
+    }
+
     handleDisconnect() {
-        this.removeEventListener('receive', this.handleReceiveBytes);
-        this.removeEventListener('disconnect', this.handleDisconnect);
+        console.log(`${this.logHead} Device disconnected externally`);
+        this.disconnect();
+    }
+
+    getConnectedPort() {
+        return this.connectionId;
+    }
+
+    createPortPath(port, portInfo) {
+        if (!this.portPaths.has(port)) {
+            const vendorId = portInfo.usbVendorId ?? "unknown";
+            const productId = portInfo.usbProductId ?? "unknown";
+            this.portPaths.set(port, `serial_${vendorId}_${productId}_${this.nextPortId++}`);
+        }
+
+        return this.portPaths.get(port);
+    }
+
+    createPort(port) {
+        const portInfo = port.getInfo();
+        return {
+            path: this.createPortPath(port, portInfo),
+            displayName: `Betaflight VID:${portInfo.usbVendorId} PID:${portInfo.usbProductId}`,
+            vendorId: portInfo.usbVendorId,
+            productId: portInfo.usbProductId,
+            port: port,
+        };
+    }
+
+    async loadDevices() {
+        try {
+            const ports = await navigator.serial.getPorts();
+            this.ports = ports.map(port => this.createPort(port));
+        } catch (error) {
+            console.error(`${this.logHead} Error loading devices:`, error);
+        }
+    }
+
+    async requestPermissionDevice(showAllSerialDevices = false) {
+        let newPermissionPort = null;
+
+        try {
+            const options = showAllSerialDevices ? {} : { filters: webSerialDevices };
+            const userSelectedPort = await navigator.serial.requestPort(options);
+            newPermissionPort = this.ports.find(port => port.port === userSelectedPort);
+
+            if (!newPermissionPort) {
+                newPermissionPort = this.handleNewDevice(userSelectedPort);
+            }
+        } catch (error) {
+            console.error(`${this.logHead} User didn't select any SERIAL device when requesting permission:`, error);
+        }
+
+        return newPermissionPort;
+    }
+
+    async getDevices() {
+        await this.loadDevices();
+        return this.ports;
     }
 
     async connect(pathOrOptions, maybeOptions, maybeCallback) {
         const { callback, options } = this.normalizeConnectArguments(pathOrOptions, maybeOptions, maybeCallback);
         this.openRequested = true;
+        this.closeRequested = false;
         if (!navigator.serial) {
             console.warn(`${this.logHead}Web Serial is not available in this browser or context`);
             this.openRequested = false;
@@ -2751,15 +2869,24 @@ class WebSerial extends EventTarget {
         }
 
         try {
-            this.port = await navigator.serial.requestPort({
-                filters: webSerialDevices,
-            });
+            await this.loadDevices();
+            const requestedPath = typeof pathOrOptions === 'string' ? pathOrOptions : null;
+            const device = this.ports.find(port => port.path === requestedPath);
 
+            if (!device) {
+                console.error(`${this.logHead} Device not found: ${requestedPath}`);
+                this.openRequested = false;
+                callback?.(false);
+                this.dispatchEvent(new CustomEvent("connect", { detail: false }));
+                return;
+            }
+
+            this.port = device.port;
             await this.port.open(options);
             const connectionInfo = this.port.getInfo();
             this.connectionInfo = {
                 ...connectionInfo,
-                connectionId: connectionInfo.connectionId || 'webserial',
+                connectionId: requestedPath,
             };
             this.writer = this.port.writable.getWriter();
             this.reader = this.port.readable.getReader();
@@ -2783,7 +2910,7 @@ class WebSerial extends EventTarget {
             this.openRequested = false;
 
             this.addEventListener("receive", this.handleReceiveBytes);
-            this.addEventListener('disconnect', this.handleDisconnect);
+            this.port.addEventListener?.("disconnect", this.handleDisconnect);
 
             console.log(
                 `${this.logHead} Connection opened with ID: ${this.connectionInfo.connectionId}, Baud: ${options.baudRate}`,
@@ -2836,23 +2963,48 @@ class WebSerial extends EventTarget {
     }
 
     async disconnect(callback) {
+        if (!this.connected && !this.port) {
+            callback?.(true);
+            return true;
+        }
+
         this.connected = false;
         this.transmitting = false;
         this.reading = false;
         this.bytesReceived = 0;
         this.bytesSent = 0;
 
+        if (this.closeRequested) {
+            callback?.(true);
+            return true;
+        }
+
+        this.closeRequested = true;
+
         const doCleanup = async () => {
             if (this.reader) {
-                this.reader.releaseLock();
+                try {
+                    await this.reader.cancel();
+                } catch (error) {
+                    console.warn(`${this.logHead} Reader cancel error:`, error);
+                }
                 this.reader = null;
             }
             if (this.writer) {
-                await this.writer.releaseLock();
+                try {
+                    this.writer.releaseLock();
+                } catch (error) {
+                    console.warn(`${this.logHead} Writer release error:`, error);
+                }
                 this.writer = null;
             }
             if (this.port) {
-                await this.port.close();
+                this.port.removeEventListener?.("disconnect", this.handleDisconnect);
+                try {
+                    await this.port.close();
+                } catch (error) {
+                    console.warn(`${this.logHead} Port close error:`, error);
+                }
                 this.port = null;
             }
         };
@@ -2879,6 +3031,7 @@ class WebSerial extends EventTarget {
             if (this.openCanceled) {
                 this.openCanceled = false;
             }
+            this.closeRequested = false;
         }
     }
 

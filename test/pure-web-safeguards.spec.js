@@ -14,6 +14,15 @@ describe('pure web safeguards', () => {
         expect(mainJs).not.toContain('serial$3 as b');
     });
 
+    it('keeps a real browser serial device model instead of a single hard-coded webserial pseudo-port', () => {
+        const mainJs = readProjectFile('js/main.js');
+
+        expect(mainJs).toContain('this.ports = []');
+        expect(mainJs).toContain('navigator.serial.addEventListener');
+        expect(mainJs).toContain('requestPermissionDevice');
+        expect(mainJs).not.toContain("path: 'webserial'");
+    });
+
     it('fills browser chrome polyfill gaps used by logging, setup, and vtx flows', () => {
         const polyfillJs = readProjectFile('js/browser_chrome_polyfill.js');
 
