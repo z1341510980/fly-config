@@ -1817,6 +1817,53 @@ PortHandler.check_usb_devices = function (callback) {
     });
 };
 
+PortHandler.getAuthorizedDfuDevices = function() {
+    return new Promise(resolve => {
+        if (!(typeof navigator !== 'undefined' && 'usb' in navigator)) {
+            resolve([]);
+            return;
+        }
+
+        chrome.usb.getDevices(usbDevices, function(result) {
+            resolve(result || []);
+        });
+    });
+};
+
+PortHandler.waitForNewDfuDevice = async function(timeout = 10000, interval = 500) {
+    const start = Date.now();
+    const getIdentifier = device => device.serialNumber || `${device.vendorId}_${device.productId}`;
+    const knownDevices = new Map();
+
+    for (const device of await this.getAuthorizedDfuDevices()) {
+        const identifier = getIdentifier(device);
+        knownDevices.set(identifier, (knownDevices.get(identifier) ?? 0) + 1);
+    }
+
+    while (Date.now() - start < timeout) {
+        try {
+            const devices = await this.getAuthorizedDfuDevices();
+            const seenNow = new Map();
+            const hasNewDevice = devices.some(device => {
+                const identifier = getIdentifier(device);
+                const countNow = (seenNow.get(identifier) ?? 0) + 1;
+                seenNow.set(identifier, countNow);
+                return countNow > (knownDevices.get(identifier) ?? 0);
+            });
+
+            if (hasNewDevice) {
+                return true;
+            }
+        } catch (error) {
+            console.warn('PortHandler.waitForNewDfuDevice failed:', error);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, interval));
+    }
+
+    return false;
+};
+
 PortHandler.removePort = function(currentPorts) {
     const self = this;
     const removePorts = self.array_difference(self.initialPorts, currentPorts);

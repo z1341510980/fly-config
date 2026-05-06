@@ -32,6 +32,16 @@ describe('webusb dfu support', () => {
         expect(firmwareFlasherJs).toContain('openDevice(requestedDevice');
     });
 
+    it('waits for a newly appeared DFU device instead of relying only on a stale availability flag', () => {
+        const mainJs = readProjectFile('js/main.js');
+        const firmwareFlasherJs = readProjectFile('firmware_flasher.js');
+
+        expect(mainJs).toContain('PortHandler.waitForNewDfuDevice = async function');
+        expect(mainJs).toContain('const knownDevices = new Map()');
+        expect(mainJs).toContain('knownDevices.get(');
+        expect(firmwareFlasherJs).toContain('PortHandler.waitForNewDfuDevice(10000, 100)');
+    });
+
     it('guides the user through WebUSB DFU selection and retry flows', () => {
         const firmwareFlasherJs = readProjectFile('firmware_flasher.js');
 

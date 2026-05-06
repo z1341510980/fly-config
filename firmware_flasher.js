@@ -1564,6 +1564,19 @@ STM32_protocol.prototype.connect = function (port, baud, hex, options, callback)
 
         const onDisconnect = disconnectionResult => {
             if (disconnectionResult) {
+                if (TABS.firmware_flasher?.isWebUsbMode?.()) {
+                    PortHandler.waitForNewDfuDevice(10000, 100).then(hasNewDfuDevice => {
+                        if (hasNewDfuDevice) {
+                            console.log('New DFU device detected in WebUSB flow');
+                            startFlashing();
+                        } else {
+                            console.log('failed to get DFU connection, gave up after 10 seconds');
+                            TABS.firmware_flasher.showWebUsbDfuRetryDialog(hex, options);
+                        }
+                    });
+                    return;
+                }
+
                 // wait until board boots into bootloader mode
                 // MacOs may need 5 seconds delay
                 function waitForDfu() {
@@ -1576,12 +1589,8 @@ STM32_protocol.prototype.connect = function (port, baud, hex, options, callback)
                         if (failedAttempts > 100) {
                             clearInterval(dfuWaitInterval);
                             console.log(`failed to get DFU connection, gave up after 10 seconds`);
-                            if (TABS.firmware_flasher?.isWebUsbMode?.()) {
-                                TABS.firmware_flasher.showWebUsbDfuRetryDialog(hex, options);
-                            } else {
-                                gui_log(i18n.getMessage('serialPortOpenFail'));
-                                GUI.connect_lock = false;
-                            }
+                            gui_log(i18n.getMessage('serialPortOpenFail'));
+                            GUI.connect_lock = false;
                         }
                     }
                 }
