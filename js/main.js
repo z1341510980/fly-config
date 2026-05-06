@@ -1669,6 +1669,18 @@ PortHandler.initializeWebSerial = function () {
     }
 };
 
+PortHandler.requestWebSerialPermission = async function() {
+    const requestedPort = await serialWeb.requestPermissionDevice(this.showAllSerialDevices);
+    await serialWeb.getDevices();
+    await this.initializeWebSerial();
+
+    if (requestedPort?.path && this.portPickerElement.children(`[value="${requestedPort.path}"]`).length) {
+        this.portPickerElement.val(requestedPort.path).trigger('change');
+    }
+
+    return requestedPort;
+};
+
 PortHandler.reinitialize = function () {
     if (isWeb()) {
         this.initializeWebSerial();
@@ -9447,7 +9459,7 @@ function initializeSerialBackend() {
     });
 
 
-    $$1("div.connect_controls a.connect").on('click', function () {
+    $$1("div.connect_controls a.connect").on('click', async function () {
 
         const selectedPort = $$1('div#port-picker #port option:selected');
         const selectedPortData = selectedPort.data() || {};
@@ -9485,6 +9497,14 @@ function initializeSerialBackend() {
 
                         serial.connect('virtual', {}, onOpenVirtual);
                     } else if (isWeb()) {
+                        if (portName.startsWith('requestpermission-serial')) {
+                            $$1('div#port-picker #port, div#port-picker #baud, div#port-picker #delay').prop('disabled', false);
+                            $$1('div.connect_controls div.connect_state').text(i18n$1.getMessage('connect'));
+                            GUI.connecting_to = false;
+                            await PortHandler$1.requestWebSerialPermission();
+                            return;
+                        }
+
                         // Explicitly disconnect the event listeners before attaching the new ones.
                         serial.removeEventListener('connect', connectHandler);
                         serial.addEventListener('connect', connectHandler);
@@ -9492,7 +9512,7 @@ function initializeSerialBackend() {
                         serial.removeEventListener('disconnect', disconnectHandler);
                         serial.addEventListener('disconnect', disconnectHandler);
 
-                        serial.connect({ baudRate });
+                        serial.connect(portName, { baudRate });
                     } else {
                         serial.connect(
                             portName,

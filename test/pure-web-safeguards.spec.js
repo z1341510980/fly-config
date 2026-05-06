@@ -23,6 +23,14 @@ describe('pure web safeguards', () => {
         expect(mainJs).not.toContain("path: 'webserial'");
     });
 
+    it('routes the selected browser serial port path through the connect action and supports permission requests', () => {
+        const mainJs = readProjectFile('js/main.js');
+
+        expect(mainJs).toContain("portName.startsWith('requestpermission-serial')");
+        expect(mainJs).toContain('await PortHandler$1.requestWebSerialPermission()');
+        expect(mainJs).toContain('serial.connect(portName, { baudRate });');
+    });
+
     it('fills browser chrome polyfill gaps used by logging, setup, and vtx flows', () => {
         const polyfillJs = readProjectFile('js/browser_chrome_polyfill.js');
 
