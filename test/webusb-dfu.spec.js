@@ -31,4 +31,12 @@ describe('webusb dfu support', () => {
         expect(firmwareFlasherJs).toContain('chrome.usb.requestDevice');
         expect(firmwareFlasherJs).toContain('openDevice(requestedDevice');
     });
+
+    it('guides the user through WebUSB DFU selection and retry flows', () => {
+        const firmwareFlasherJs = readProjectFile('firmware_flasher.js');
+
+        expect(firmwareFlasherJs).toContain('firmwareFlasherWebUsbGuideTitle');
+        expect(firmwareFlasherJs).toContain('firmwareFlasherWebUsbRetryTitle');
+        expect(firmwareFlasherJs).toContain('firmwareFlasherWebUsbChooseDevice');
+    });
 });

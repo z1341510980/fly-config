@@ -2757,6 +2757,21 @@
     "firmwareFlasherFlashOnConnect": {
         "message": "当飞控连接时自动烧录固件"
     },
+    "firmwareFlasherWebUsbGuideTitle": {
+        "message": "选择 DFU 设备"
+    },
+    "firmwareFlasherWebUsbGuideText": {
+        "message": "浏览器使用 WebUSB 来进行 DFU 刷写。<br \/><br \/>继续后，浏览器会弹出设备选择器。请在飞控处于 DFU 模式时选择它，然后开始刷写。"
+    },
+    "firmwareFlasherWebUsbRetryTitle": {
+        "message": "继续前请选择 DFU 设备"
+    },
+    "firmwareFlasherWebUsbRetryText": {
+        "message": "飞控已经重启，但浏览器还没有获得 DFU 设备访问权限。<br \/><br \/>如有需要请先让飞控进入 DFU 模式，然后点击下面按钮，在浏览器弹窗里选择该设备。"
+    },
+    "firmwareFlasherWebUsbChooseDevice": {
+        "message": "选择 DFU 设备"
+    },
     "firmwareFlasherFullChipErase": {
         "message": "全盘擦除（会丢失所有设置）"
     },

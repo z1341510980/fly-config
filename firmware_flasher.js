@@ -1576,8 +1576,12 @@ STM32_protocol.prototype.connect = function (port, baud, hex, options, callback)
                         if (failedAttempts > 100) {
                             clearInterval(dfuWaitInterval);
                             console.log(`failed to get DFU connection, gave up after 10 seconds`);
-                            gui_log(i18n.getMessage('serialPortOpenFail'));
-                            GUI.connect_lock = false;
+                            if (TABS.firmware_flasher?.isWebUsbMode?.()) {
+                                TABS.firmware_flasher.showWebUsbDfuRetryDialog(hex, options);
+                            } else {
+                                gui_log(i18n.getMessage('serialPortOpenFail'));
+                                GUI.connect_lock = false;
+                            }
                         }
                     }
                 }
@@ -2918,9 +2922,16 @@ firmware_flasher.initialize = function (callback) {
                     gui_log(i18n.getMessage('firmwareFlasherNoValidPort'));
                 }
             } else {
-                tracking.sendEvent(tracking.EVENT_CATEGORIES.FLASHING, 'DFU Flashing', { filename: self.filename || null });
+                const startDfuFlash = () => {
+                    tracking.sendEvent(tracking.EVENT_CATEGORIES.FLASHING, 'DFU Flashing', { filename: self.filename || null });
+                    STM32DFU.connect(usbDevices, firmware, options);
+                };
 
-                STM32DFU.connect(usbDevices, firmware, options);
+                if (self.isWebUsbMode() && !PortHandler.dfu_available) {
+                    self.showWebUsbDfuGuideDialog(startDfuFlash);
+                } else {
+                    startDfuFlash();
+                }
             }
 
             self.isFlashing = false;
@@ -3589,6 +3600,45 @@ firmware_flasher.initialize = function (callback) {
 
 firmware_flasher.isSerialPortAvailable = function() {
     return PortHandler.port_available && !GUI.connect_lock;
+};
+
+firmware_flasher.isWebUsbMode = function() {
+    return typeof navigator !== 'undefined' && 'usb' in navigator && !GUI.isNWJS() && !GUI.isCordova();
+};
+
+firmware_flasher.restoreFlashUi = function() {
+    GUI.connect_lock = false;
+    this.isFlashing = false;
+    this.enableFlashButton(!!this.parsed_hex);
+    this.enableLoadRemoteFileButton(!!this.selectedBoard);
+    this.enableLoadFileButton(true);
+    this.enableDfuExitButton(!!$('option:selected', $('div#port-picker #port')).data().isDFU);
+};
+
+firmware_flasher.showWebUsbDfuGuideDialog = function(onContinue) {
+    GUI.showYesNoDialog({
+        title: i18n.getMessage('firmwareFlasherWebUsbGuideTitle'),
+        text: i18n.getMessage('firmwareFlasherWebUsbGuideText'),
+        buttonYesText: i18n.getMessage('firmwareFlasherWebUsbChooseDevice'),
+        buttonNoText: i18n.getMessage('cancel'),
+        buttonYesCallback: onContinue,
+        buttonNoCallback: () => this.restoreFlashUi(),
+    });
+};
+
+firmware_flasher.showWebUsbDfuRetryDialog = function(firmware, options) {
+    GUI.showYesNoDialog({
+        title: i18n.getMessage('firmwareFlasherWebUsbRetryTitle'),
+        text: i18n.getMessage('firmwareFlasherWebUsbRetryText'),
+        buttonYesText: i18n.getMessage('firmwareFlasherWebUsbChooseDevice'),
+        buttonNoText: i18n.getMessage('cancel'),
+        buttonYesCallback: () => {
+            GUI.connect_lock = true;
+            this.isFlashing = true;
+            STM32DFU.connect(usbDevices, firmware, options);
+        },
+        buttonNoCallback: () => this.restoreFlashUi(),
+    });
 };
 
 firmware_flasher.updateDetectBoardButton = function() {

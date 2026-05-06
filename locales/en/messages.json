@@ -3484,6 +3484,21 @@
     "firmwareFlasherFlashOnConnectDescription": {
         "message": "Attempt to flash the board automatically (triggered by newly detected serial port).<br /><br /><span class=\"message-negative\">WARNING</span>: this function disables the auto-detect and backup feature."
     },
+    "firmwareFlasherWebUsbGuideTitle": {
+        "message": "Select DFU device"
+    },
+    "firmwareFlasherWebUsbGuideText": {
+        "message": "This browser uses WebUSB for DFU flashing.<br /><br />When you continue, your browser will open a device picker. Select the flight controller while it is in DFU mode to begin flashing."
+    },
+    "firmwareFlasherWebUsbRetryTitle": {
+        "message": "Choose the DFU device to continue"
+    },
+    "firmwareFlasherWebUsbRetryText": {
+        "message": "The flight controller rebooted, but the browser does not have access to the DFU device yet.<br /><br />Put the board in DFU mode if needed, then click the button below and choose it in the browser prompt."
+    },
+    "firmwareFlasherWebUsbChooseDevice": {
+        "message": "Choose DFU Device"
+    },
     "firmwareFlasherFullChipErase": {
         "message": "Full chip erase"
     },
