@@ -11,6 +11,7 @@ const testOutDir = path.join(repoRoot, testOutDirName);
 const requiredRuntimeFiles = [
     'tabs/landing.html',
     'tabs/motors.html',
+    'tabs/receiver_msp.html',
     'components/MotorOutputReordering/Body.html',
     'components/EscDshotDirection/Body.html',
     'images/light-wide-2.svg',
@@ -42,8 +43,13 @@ describe('production build output', () => {
 
             const indexHtml = fs.readFileSync(path.join(testOutDir, 'index.html'), 'utf8');
             expect(indexHtml).toContain('./assets/');
+            expect(indexHtml).not.toContain('./node_modules/');
             expect(indexHtml).not.toContain('src="/assets/');
             expect(indexHtml).not.toContain('href="/assets/');
+
+            const receiverMspHtml = fs.readFileSync(path.join(testOutDir, 'tabs/receiver_msp.html'), 'utf8');
+            expect(receiverMspHtml).toContain('../assets/');
+            expect(receiverMspHtml).not.toContain('../js/tabs/receiver_msp.js');
         },
         120000,
     );

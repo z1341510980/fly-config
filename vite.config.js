@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
 
+const projectRoot = process.cwd();
+
 const runtimeAssetTargets = [
     { from: 'tabs', to: 'tabs' },
     { from: 'components', to: 'components' },
@@ -51,6 +53,26 @@ function copyRuntimeAssets() {
                     continue;
                 }
 
+                if (target.from === 'tabs') {
+                    fs.mkdirSync(destination, { recursive: true });
+
+                    for (const child of fs.readdirSync(source)) {
+                        const sourceChild = path.join(source, child);
+                        const destinationChild = path.join(destination, child);
+
+                        if (child === 'receiver_msp.html' && fs.existsSync(destinationChild)) {
+                            continue;
+                        }
+
+                        fs.cpSync(sourceChild, destinationChild, {
+                            recursive: true,
+                            force: true,
+                        });
+                    }
+
+                    continue;
+                }
+
                 fs.cpSync(source, destination, {
                     recursive: true,
                     force: true,
@@ -68,6 +90,12 @@ export default defineConfig({
         // Keep linked CSS and referenced assets as files so legacy relative paths
         // like ../images/... still resolve after deployment.
         assetsInlineLimit: 0,
+        rollupOptions: {
+            input: {
+                main: path.resolve(projectRoot, 'index.html'),
+                receiver_msp: path.resolve(projectRoot, 'tabs/receiver_msp.html'),
+            },
+        },
     },
     plugins: [copyRuntimeAssets()],
 });

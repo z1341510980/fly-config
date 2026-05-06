@@ -10,10 +10,10 @@ import '../../multiple-select.js';
 
 // This is a hack to get the i18n var of the parent, but the i18n.localizePage not works
 // It seems than when node opens a new window, the module "context" is different, so the i18n var is not initialized
-const i18n = opener.i18n;
+const i18n = window.opener?.i18n || { getMessage: key => key };
 
 const css_dark = [
-    '/css/dark-theme.css',
+    '../css/dark-theme.css',
 ];
 
 const CHANNEL_MIN_VALUE = 1000;
@@ -76,10 +76,37 @@ function transmitChannels() {
     }
 
     // Callback given to us by the window creator so we can have it send data over MSP for us:
-    if (!window.setRawRx(channelValues)) {
+    if (!window.setRawRx || !window.setRawRx(channelValues)) {
         // MSP connection has gone away
-        chrome.app.window.current().close();
+        closeReceiverWindow();
     }
+}
+
+function getChromeAppWindow() {
+    return chrome?.app?.window?.current?.() || null;
+}
+
+function closeReceiverWindow() {
+    const appWindow = getChromeAppWindow();
+
+    if (appWindow) {
+        appWindow.close();
+        return;
+    }
+
+    window.close();
+}
+
+function shrinkReceiverWindow(deltaHeight) {
+    const appWindow = getChromeAppWindow();
+
+    if (!appWindow) {
+        return;
+    }
+
+    appWindow.innerBounds.minHeight -= deltaHeight;
+    appWindow.innerBounds.height -= deltaHeight;
+    appWindow.innerBounds.maxHeight -= deltaHeight;
 }
 
 function stickPortionToChannelValue(portion) {
@@ -159,9 +186,7 @@ $(".button-enable .btn").on("click", function() {
     const shrinkHeight = $(".warning").height();
 
     $(".warning").slideUp("short", function() {
-        chrome.app.window.current().innerBounds.minHeight -= shrinkHeight;
-        chrome.app.window.current().innerBounds.height -= shrinkHeight;
-        chrome.app.window.current().innerBounds.maxHeight -= shrinkHeight;
+        shrinkReceiverWindow(shrinkHeight);
     });
 
     enableTX = true;

@@ -15,6 +15,11 @@
             };
         };
     }
+    if (typeof chromeApi.runtime.getURL !== 'function') {
+        chromeApi.runtime.getURL = function (filePath) {
+            return new URL(filePath, root.location.href).toString();
+        };
+    }
 
     if (chromeApi.fileSystem) {
         return;
@@ -89,6 +94,7 @@
         const fileName = handle?.name || suggestedName || 'download';
 
         return {
+            __webHandle: handle || null,
             name: fileName,
             createWriter(callback, errorCallback) {
                 const writer = {
@@ -131,6 +137,7 @@
         const file = fileOrHandle instanceof File ? fileOrHandle : null;
 
         return {
+            __webHandle: fileOrHandle || file || null,
             name: file?.name || fileOrHandle?.name || 'selected-file',
             async file(callback) {
                 const selectedFile = file || await fileOrHandle.getFile();
@@ -138,6 +145,9 @@
             },
         };
     }
+
+    const retainedEntries = new Map();
+    let retainedEntryCounter = 0;
 
     function openFileFallback(options, callback) {
         const input = document.createElement('input');
@@ -191,8 +201,27 @@
         getDisplayPath(entry, callback) {
             callback(entry?.name || '');
         },
+        getWritableEntry(entry, callback) {
+            callback(entry || null);
+        },
         isWritableEntry(_entry, callback) {
             callback(true);
+        },
+        retainEntry(entry) {
+            if (!entry) {
+                return null;
+            }
+
+            if (!entry.__retainedId) {
+                retainedEntryCounter += 1;
+                entry.__retainedId = `web-retained-entry-${retainedEntryCounter}`;
+            }
+
+            retainedEntries.set(entry.__retainedId, entry);
+            return entry.__retainedId;
+        },
+        restoreEntry(entryId, callback) {
+            callback(retainedEntries.get(entryId) || null);
         },
     };
 })();

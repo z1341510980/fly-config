@@ -558,18 +558,8 @@ receiver.initialize = function (callback) {
         $("a.sticks").click(function() {
             const windowWidth = 370;
             const windowHeight = 510;
-
-            chrome.app.window.create("/tabs/receiver_msp.html", {
-                id: "receiver_msp",
-                innerBounds: {
-                    minWidth: windowWidth, minHeight: windowHeight,
-                    width: windowWidth, height: windowHeight,
-                    maxWidth: windowWidth, maxHeight: windowHeight,
-                },
-                alwaysOnTop: true,
-            }, function(createdWindow) {
-                // Give the window a callback it can use to send the channels (otherwise it can't see those objects)
-                createdWindow.contentWindow.setRawRx = function(channels) {
+            const setPopupCallbacks = function(receiverWindow) {
+                receiverWindow.setRawRx = function(channels) {
                     if (CONFIGURATOR.connectionValid && GUI.active_tab !== 'cli') {
                         mspHelper.setRawRx(channels);
                         return true;
@@ -579,10 +569,41 @@ receiver.initialize = function (callback) {
                 };
 
                 DarkTheme.isDarkThemeEnabled(function(isEnabled) {
-                    windowWatcherUtil.passValue(createdWindow, 'darkTheme', isEnabled);
+                    windowWatcherUtil.passValue(receiverWindow, 'darkTheme', isEnabled);
                 });
+            };
 
-            });
+            if (chrome.app?.window?.create) {
+                chrome.app.window.create("/tabs/receiver_msp.html", {
+                    id: "receiver_msp",
+                    innerBounds: {
+                        minWidth: windowWidth, minHeight: windowHeight,
+                        width: windowWidth, height: windowHeight,
+                        maxWidth: windowWidth, maxHeight: windowHeight,
+                    },
+                    alwaysOnTop: true,
+                }, function(createdWindow) {
+                    setPopupCallbacks(createdWindow);
+                });
+                return;
+            }
+
+            const receiverWindow = window.open('./tabs/receiver_msp.html', 'receiver_msp', `popup=yes,width=${windowWidth},height=${windowHeight}`);
+
+            if (!receiverWindow) {
+                gui_log('Unable to open control sticks window. Please allow pop-ups for this site.');
+                return;
+            }
+
+            const onLoad = function() {
+                setPopupCallbacks(receiverWindow);
+            };
+
+            if (receiverWindow.document?.readyState === 'complete') {
+                onLoad();
+            } else {
+                receiverWindow.addEventListener('load', onLoad, { once: true });
+            }
         });
 
         let showBindButton = false;

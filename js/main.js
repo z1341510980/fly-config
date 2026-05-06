@@ -2557,8 +2557,69 @@ class WebSerial extends EventTarget {
         this.reader = null;
         this.writer = null;
         this.reading = false;
+        this.legacyReceiveListeners = new Map();
+        this.legacyReceiveErrorListeners = new Set();
+
+        this.onReceive = {
+            addListener: listener => this.addLegacyReceiveListener(listener),
+            removeListener: listener => this.removeLegacyReceiveListener(listener),
+        };
+
+        this.onReceiveError = {
+            addListener: listener => this.legacyReceiveErrorListeners.add(listener),
+            removeListener: listener => this.legacyReceiveErrorListeners.delete(listener),
+        };
 
         this.connect = this.connect.bind(this);
+    }
+
+    toLegacyReadInfo(detail) {
+        const view = detail instanceof Uint8Array ? detail : new Uint8Array(detail);
+        const data = (view.byteOffset === 0 && view.byteLength === view.buffer.byteLength)
+            ? view.buffer
+            : view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
+
+        return { data };
+    }
+
+    addLegacyReceiveListener(listener) {
+        if (this.legacyReceiveListeners.has(listener)) {
+            return;
+        }
+
+        const wrappedListener = event => listener(this.toLegacyReadInfo(event.detail));
+        this.legacyReceiveListeners.set(listener, wrappedListener);
+        this.addEventListener('receive', wrappedListener);
+    }
+
+    removeLegacyReceiveListener(listener) {
+        const wrappedListener = this.legacyReceiveListeners.get(listener);
+
+        if (!wrappedListener) {
+            return;
+        }
+
+        this.removeEventListener('receive', wrappedListener);
+        this.legacyReceiveListeners.delete(listener);
+    }
+
+    normalizeConnectArguments(pathOrOptions, maybeOptions, maybeCallback) {
+        const callback = typeof maybeCallback === 'function'
+            ? maybeCallback
+            : (typeof maybeOptions === 'function' ? maybeOptions : null);
+
+        const rawOptions = (typeof pathOrOptions === 'object' && pathOrOptions !== null)
+            ? pathOrOptions
+            : ((typeof maybeOptions === 'object' && maybeOptions !== null) ? maybeOptions : {});
+
+        const normalizedOptions = {
+            baudRate: rawOptions.baudRate ?? rawOptions.bitrate ?? 115200,
+            dataBits: rawOptions.dataBits ?? 8,
+            stopBits: rawOptions.stopBits === 'two' ? 2 : 1,
+            parity: rawOptions.parity ?? rawOptions.parityBit ?? 'none',
+        };
+
+        return { callback, options: normalizedOptions };
     }
 
     handleReceiveBytes(info) {
@@ -2570,11 +2631,13 @@ class WebSerial extends EventTarget {
         this.removeEventListener('disconnect', this.handleDisconnect);
     }
 
-    async connect(options) {
+    async connect(pathOrOptions, maybeOptions, maybeCallback) {
+        const { callback, options } = this.normalizeConnectArguments(pathOrOptions, maybeOptions, maybeCallback);
         this.openRequested = true;
         if (!navigator.serial) {
             console.warn(`${this.logHead}Web Serial is not available in this browser or context`);
             this.openRequested = false;
+            callback?.(false);
             this.dispatchEvent(new CustomEvent("connect", { detail: false }));
             return;
         }
@@ -2597,6 +2660,7 @@ class WebSerial extends EventTarget {
                 console.error(error);
             }
             this.openRequested = false;
+            callback?.(false);
             this.dispatchEvent(new CustomEvent("connect", { detail: false }));
             return;
         }
@@ -2617,6 +2681,7 @@ class WebSerial extends EventTarget {
                 `${this.logHead} Connection opened with ID: ${this.connectionInfo.connectionId}, Baud: ${options.baudRate}`,
             );
 
+            callback?.(this.connectionInfo);
             this.dispatchEvent(
                 new CustomEvent("connect", { detail: this.connectionInfo }),
             );
@@ -2642,6 +2707,7 @@ class WebSerial extends EventTarget {
                 this.openRequested = false;
                 this.openCanceled = false;
                 this.disconnect(() => {
+                    callback?.(false);
                     this.dispatchEvent(new CustomEvent("connect", { detail: false }));
                 });
             }, 150);
@@ -2651,15 +2717,17 @@ class WebSerial extends EventTarget {
             );
             this.openRequested = false;
             this.openCanceled = false;
+            callback?.(false);
             this.dispatchEvent(new CustomEvent("connect", { detail: false }));
         } else {
             this.openRequested = false;
             console.log(`${this.logHead} Failed to open serial port`);
+            callback?.(false);
             this.dispatchEvent(new CustomEvent("connect", { detail: false }));
         }
     }
 
-    async disconnect() {
+    async disconnect(callback) {
         this.connected = false;
         this.transmitting = false;
         this.reading = false;
@@ -2690,12 +2758,14 @@ class WebSerial extends EventTarget {
 
             this.connectionId = false;
             this.bitrate = 0;
+            callback?.(true);
             this.dispatchEvent(new CustomEvent("disconnect", { detail: true }));
         } catch (error) {
             console.error(error);
             console.error(
                 `${this.logHead}Failed to close connection with ID: ${this.connectionId} closed, Sent: ${this.bytesSent} bytes, Received: ${this.bytesReceived} bytes`,
             );
+            callback?.(false);
             this.dispatchEvent(new CustomEvent("disconnect", { detail: false }));
         } finally {
             if (this.openCanceled) {
@@ -2726,6 +2796,14 @@ class WebSerial extends EventTarget {
         return {
             bytesSent: this.bytesSent,
         };
+    }
+
+    getInfo(callback) {
+        callback?.({
+            ...this.connectionInfo,
+            bitrate: this.bitrate,
+            connectionId: this.connectionId,
+        });
     }
 }
 
@@ -13963,5 +14041,5 @@ function startProcess() {
 window.isExpertModeEnabled = isExpertModeEnabled;
 window.appReady = appReady;
 
-export { BuildApi as B, CliAutoComplete as C, DarkTheme as D, EscProtocols as E, Features as F, GUI as G, MspHelper as M, PortHandler$1 as P, TABS as T, UI_PHONES as U, VtxDeviceTypes as V, checkSetupAnalytics as a, serial$3 as b, checkForConfiguratorUpdates as c, MSP$1 as d, MSPCodes as e, PortUsage as f, get as g, set as h, sensor_status as i, update_dataflash_global as j, Beepers as k, reinitializeConnection as l, mspHelper as m, have_sensor as n, isExpertModeEnabled as o, updateTabList as p, showErrorDialog as q, read_serial as r, setDarkTheme as s, tracking as t, usbDevices as u, serial$1 as serialAdapter };
+export { BuildApi as B, CliAutoComplete as C, DarkTheme as D, EscProtocols as E, Features as F, GUI as G, MspHelper as M, PortHandler$1 as P, TABS as T, UI_PHONES as U, VtxDeviceTypes as V, checkSetupAnalytics as a, serial$1 as b, checkForConfiguratorUpdates as c, MSP$1 as d, MSPCodes as e, PortUsage as f, get as g, set as h, sensor_status as i, update_dataflash_global as j, Beepers as k, reinitializeConnection as l, mspHelper as m, have_sensor as n, isExpertModeEnabled as o, updateTabList as p, showErrorDialog as q, read_serial as r, setDarkTheme as s, tracking as t, usbDevices as u, serial$1 as serialAdapter };
 //# sourceMappingURL=main.js.map
