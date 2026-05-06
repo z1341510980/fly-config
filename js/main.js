@@ -1615,15 +1615,35 @@ PortHandler.initializeWebSerial = function () {
     this.showVirtualMode = get$1('showVirtualMode').showVirtualMode;
 
     const webSerialSupported = typeof navigator !== 'undefined' && 'serial' in navigator;
-    const webSerialPorts = [{
+    const webUsbSupported = typeof navigator !== 'undefined' && 'usb' in navigator;
+    const webPorts = [{
         path: 'webserial',
         displayName: webSerialSupported ? 'Web Serial' : 'Web Serial unavailable - use HTTPS in Chrome or Edge',
     }];
 
-    this.updatePortSelect(webSerialPorts);
+    if (webUsbSupported) {
+        webPorts.push({
+            path: 'DFU',
+            displayName: 'WebUSB DFU',
+            isDFU: true,
+            isWebUsb: true,
+        });
+    }
+
+    this.updatePortSelect(webPorts);
     this.portPickerElement.val('webserial').trigger('change');
-    this.initialPorts = webSerialPorts;
+    this.initialPorts = webPorts;
     this.port_available = webSerialSupported;
+
+    if (webUsbSupported) {
+        const self = this;
+        const pollUsbDevices = function() {
+            self.check_usb_devices();
+            self.usbCheckLoop = setTimeout(pollUsbDevices, TIMEOUT_CHECK);
+        };
+
+        pollUsbDevices();
+    }
 };
 
 PortHandler.reinitialize = function () {
@@ -1704,10 +1724,46 @@ PortHandler.check_serial_devices = function () {
 PortHandler.check_usb_devices = function (callback) {
     const self = this;
     if (isWeb()) {
-        self.dfu_available = false;
-        if (callback) {
-            callback(false);
+        if (!(typeof navigator !== 'undefined' && 'usb' in navigator)) {
+            self.dfu_available = false;
+            if (callback) {
+                callback(false);
+            }
+            return;
         }
+
+        chrome.usb.getDevices(usbDevices, function (result) {
+            const selectedPath = self.portPickerElement.val();
+            const hasMatchingDfuDevice = result.length > 0;
+            const webSerialPort = {
+                path: 'webserial',
+                displayName: typeof navigator !== 'undefined' && 'serial' in navigator
+                    ? 'Web Serial'
+                    : 'Web Serial unavailable - use HTTPS in Chrome or Edge',
+            };
+            const ports = [webSerialPort, {
+                path: 'DFU',
+                displayName: hasMatchingDfuDevice
+                    ? `DFU - ${result[0].productName || 'WebUSB Device'}`
+                    : 'WebUSB DFU',
+                isDFU: true,
+                isWebUsb: true,
+            }];
+
+            self.updatePortSelect(ports);
+            self.initialPorts = ports;
+            self.dfu_available = hasMatchingDfuDevice;
+
+            if (selectedPath && self.portPickerElement.children(`[value="${selectedPath}"]`).length) {
+                self.portPickerElement.val(selectedPath);
+            } else {
+                self.portPickerElement.val('webserial');
+            }
+
+            if (callback) {
+                callback(self.dfu_available);
+            }
+        });
         return;
     }
 
@@ -1874,7 +1930,12 @@ PortHandler.updatePortSelect = function (ports) {
         this.portPickerElement.append($$1("<option/>", {
             value: ports[i].path,
             text: portText,
-            data: {isManual: false},
+            data: {
+                isManual: !!ports[i].isManual,
+                isVirtual: !!ports[i].isVirtual,
+                isDFU: !!ports[i].isDFU,
+                isWebUsb: !!ports[i].isWebUsb,
+            },
         }));
     }
 

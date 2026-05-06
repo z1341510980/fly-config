@@ -317,14 +317,37 @@ STM32DFU_protocol.prototype.connect = function (device, hex, options, callback) 
     // reset progress bar to initial state
     TABS.firmware_flasher.flashingMessage(null, TABS.firmware_flasher.FLASH_MESSAGE_TYPES.NEUTRAL).flashProgress(0);
 
+    const requestDfuDevice = function () {
+        if (typeof chrome.usb.requestDevice !== 'function') {
+            console.log('USB DFU not found');
+            gui_log(i18n.getMessage('stm32UsbDfuNotFound'));
+            callback?.(false);
+            return;
+        }
+
+        chrome.usb.requestDevice(device, function (requestedDevice) {
+            if (checkChromeRuntimeError() || !requestedDevice) {
+                console.log('USB DFU not found');
+                gui_log(i18n.getMessage('stm32UsbDfuNotFound'));
+                callback?.(false);
+                return;
+            }
+
+            self.openDevice(requestedDevice);
+        });
+    };
+
     chrome.usb.getDevices(device, function (result) {
         if (result.length) {
             console.log(`USB DFU detected with ID: ${result[0].device}`);
 
             self.openDevice(result[0]);
+        } else if (typeof chrome.usb.requestDevice === 'function') {
+            requestDfuDevice();
         } else {
             console.log('USB DFU not found');
             gui_log(i18n.getMessage('stm32UsbDfuNotFound'));
+            callback?.(false);
         }
     });
 };

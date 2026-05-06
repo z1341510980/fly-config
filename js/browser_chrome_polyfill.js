@@ -21,12 +21,294 @@
         };
     }
 
-    if (chromeApi.fileSystem) {
-        return;
+    function clearLastError() {
+        chromeApi.runtime.lastError = null;
     }
 
     function setLastError(error) {
         chromeApi.runtime.lastError = error ? { message: error.message || String(error) } : null;
+    }
+
+    function getUsbApi() {
+        return root.navigator?.usb;
+    }
+
+    function getUsbFilters(deviceFilter) {
+        if (Array.isArray(deviceFilter)) {
+            return deviceFilter;
+        }
+
+        return deviceFilter?.filters || [];
+    }
+
+    function matchesUsbFilter(device, filter) {
+        const filters = Object.entries(filter || {});
+
+        if (!filters.length) {
+            return true;
+        }
+
+        return filters.every(([key, value]) => device?.[key] === value);
+    }
+
+    function matchesUsbFilters(device, deviceFilter) {
+        const filters = getUsbFilters(deviceFilter);
+
+        if (!filters.length) {
+            return true;
+        }
+
+        return filters.some(filter => matchesUsbFilter(device, filter));
+    }
+
+    function wrapUsbDevice(device) {
+        if (!device) {
+            return null;
+        }
+
+        if (device.__codexWebUsbWrapper) {
+            return device.__codexWebUsbWrapper;
+        }
+
+        const wrapper = {
+            __webDevice: device,
+            device: device.serialNumber || device.productName || `${device.vendorId}:${device.productId}`,
+            vendorId: device.vendorId,
+            productId: device.productId,
+            productName: device.productName,
+            manufacturerName: device.manufacturerName,
+            serialNumber: device.serialNumber,
+        };
+
+        Object.defineProperty(device, '__codexWebUsbWrapper', {
+            configurable: true,
+            enumerable: false,
+            value: wrapper,
+        });
+
+        return wrapper;
+    }
+
+    function unwrapUsbDevice(device) {
+        return device?.__webDevice || device || null;
+    }
+
+    const usbHandleMap = new Map();
+    let usbHandleCounter = 0;
+
+    function createUsbHandle(device) {
+        usbHandleCounter += 1;
+
+        const handle = {
+            handle: usbHandleCounter,
+            __webDevice: device,
+        };
+
+        usbHandleMap.set(handle.handle, device);
+        return handle;
+    }
+
+    function unwrapUsbHandle(handle) {
+        return handle?.__webDevice || usbHandleMap.get(handle?.handle) || null;
+    }
+
+    async function ensureUsbDeviceReady(device) {
+        if (!device) {
+            throw new Error('USB device handle is missing');
+        }
+
+        if (!device.opened) {
+            await device.open();
+        }
+
+        if (!device.configuration) {
+            const configurationValue = device.configurations?.[0]?.configurationValue || 1;
+            await device.selectConfiguration(configurationValue);
+        }
+
+        return device;
+    }
+
+    function dataViewToArrayBuffer(dataView) {
+        if (!dataView) {
+            return new ArrayBuffer(0);
+        }
+
+        return dataView.buffer.slice(
+            dataView.byteOffset,
+            dataView.byteOffset + dataView.byteLength,
+        );
+    }
+
+    function getUsbResultCode(status) {
+        return status === 'ok' ? 0 : -1;
+    }
+
+    async function getMatchedUsbDevices(deviceFilter) {
+        const usb = getUsbApi();
+
+        if (!usb?.getDevices) {
+            return [];
+        }
+
+        const devices = await usb.getDevices();
+        return devices.filter(device => matchesUsbFilters(device, deviceFilter)).map(wrapUsbDevice);
+    }
+
+    if (!chromeApi.usb) {
+        chromeApi.usb = {
+            async getDevices(deviceFilter, callback) {
+                clearLastError();
+
+                try {
+                    callback(await getMatchedUsbDevices(deviceFilter));
+                } catch (error) {
+                    setLastError(error);
+                    callback([]);
+                }
+            },
+            async requestDevice(deviceFilter, callback) {
+                clearLastError();
+
+                const usb = getUsbApi();
+                if (!usb?.requestDevice) {
+                    setLastError(new Error('WebUSB is not available in this browser or context'));
+                    callback(null);
+                    return;
+                }
+
+                try {
+                    const device = await usb.requestDevice({
+                        filters: getUsbFilters(deviceFilter),
+                    });
+                    callback(wrapUsbDevice(device));
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        setLastError(error);
+                    }
+                    callback(null);
+                }
+            },
+            async openDevice(deviceOrWrapper, callback) {
+                clearLastError();
+
+                try {
+                    const device = unwrapUsbDevice(deviceOrWrapper);
+                    await ensureUsbDeviceReady(device);
+                    callback(createUsbHandle(device));
+                } catch (error) {
+                    setLastError(error);
+                    callback(null);
+                }
+            },
+            async closeDevice(handle, callback) {
+                clearLastError();
+
+                try {
+                    const device = unwrapUsbHandle(handle);
+                    if (device?.opened) {
+                        await device.close();
+                    }
+                    callback?.(true);
+                } catch (error) {
+                    setLastError(error);
+                    callback?.(false);
+                }
+            },
+            async claimInterface(handle, interfaceNumber, callback) {
+                clearLastError();
+
+                try {
+                    const device = await ensureUsbDeviceReady(unwrapUsbHandle(handle));
+                    await device.claimInterface(interfaceNumber);
+                    callback?.();
+                } catch (error) {
+                    setLastError(error);
+                    callback?.();
+                }
+            },
+            async releaseInterface(handle, interfaceNumber, callback) {
+                clearLastError();
+
+                try {
+                    const device = unwrapUsbHandle(handle);
+                    if (device?.opened) {
+                        await device.releaseInterface(interfaceNumber);
+                    }
+                    callback?.();
+                } catch (error) {
+                    setLastError(error);
+                    callback?.();
+                }
+            },
+            async resetDevice(handle, callback) {
+                clearLastError();
+
+                try {
+                    const device = unwrapUsbHandle(handle);
+                    if (device?.reset) {
+                        await device.reset();
+                    }
+                    callback?.(true);
+                } catch (error) {
+                    setLastError(error);
+                    callback?.(false);
+                }
+            },
+            async getConfiguration(handle, callback) {
+                clearLastError();
+
+                try {
+                    const device = unwrapUsbHandle(handle);
+                    const configuration = device?.configuration || device?.configurations?.[0] || { interfaces: [] };
+                    callback?.(configuration);
+                } catch (error) {
+                    setLastError(error);
+                    callback?.({ interfaces: [] });
+                }
+            },
+            async controlTransfer(handle, transferInfo, callback) {
+                clearLastError();
+
+                try {
+                    const device = await ensureUsbDeviceReady(unwrapUsbHandle(handle));
+                    const setup = {
+                        requestType: transferInfo.requestType,
+                        recipient: transferInfo.recipient,
+                        request: transferInfo.request,
+                        value: transferInfo.value,
+                        index: transferInfo.index,
+                    };
+
+                    if (transferInfo.direction === 'in') {
+                        const result = await device.controlTransferIn(setup, transferInfo.length);
+                        callback?.({
+                            resultCode: getUsbResultCode(result.status),
+                            data: dataViewToArrayBuffer(result.data),
+                        });
+                        return;
+                    }
+
+                    const data = transferInfo.data ? new Uint8Array(transferInfo.data) : new Uint8Array(0);
+                    const result = await device.controlTransferOut(setup, data);
+                    callback?.({
+                        resultCode: getUsbResultCode(result.status),
+                        bytesWritten: result.bytesWritten || 0,
+                    });
+                } catch (error) {
+                    setLastError(error);
+                    callback?.({
+                        resultCode: -1,
+                        data: new ArrayBuffer(0),
+                        bytesWritten: 0,
+                    });
+                }
+            },
+        };
+    }
+
+    if (chromeApi.fileSystem) {
+        return;
     }
 
     function normalizeExtension(extension) {
