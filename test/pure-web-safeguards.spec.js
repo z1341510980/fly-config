@@ -20,14 +20,16 @@ describe('pure web safeguards', () => {
         expect(mainJs).toContain('this.ports = []');
         expect(mainJs).toContain('navigator.serial.addEventListener');
         expect(mainJs).toContain('requestPermissionDevice');
-        expect(mainJs).not.toContain("path: 'webserial'");
+        expect(mainJs).toContain("path: 'webserial'");
+        expect(mainJs).toContain('isWebSerialLauncher: true');
     });
 
     it('routes the selected browser serial port path through the connect action and supports permission requests', () => {
         const mainJs = readProjectFile('js/main.js');
 
-        expect(mainJs).toContain("portName.startsWith('requestpermission-serial')");
+        expect(mainJs).toContain("selectedPortData.isWebSerialLauncher || portName === 'webserial'");
         expect(mainJs).toContain('await PortHandler$1.requestWebSerialPermission()');
+        expect(mainJs).toContain('serial.connect(requestedPort.path, { baudRate });');
         expect(mainJs).toContain('serial.connect(portName, { baudRate });');
     });
 

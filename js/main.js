@@ -1619,9 +1619,19 @@ PortHandler.initializeWebSerial = function () {
     const webUsbSupported = typeof navigator !== 'undefined' && 'usb' in navigator;
     this.port_available = webSerialSupported;
 
-    const refreshPorts = async function() {
-        const serialPorts = webSerialSupported ? await serialWeb.getDevices() : [];
-        const ports = [...serialPorts];
+    const buildWebPortOptions = async function() {
+        const ports = [];
+
+        if (webSerialSupported) {
+            ports.push({
+                path: 'webserial',
+                displayName: 'Web Serial',
+                isWebSerialLauncher: true,
+            });
+
+            const serialPorts = await serialWeb.getDevices();
+            ports.push(...serialPorts);
+        }
 
         if (webUsbSupported) {
             const usbDevicesFound = await self.getAuthorizedDfuDevices();
@@ -1634,12 +1644,11 @@ PortHandler.initializeWebSerial = function () {
             });
         }
 
-        if (!ports.length && webSerialSupported) {
-            ports.push({
-                path: 'requestpermission-serial',
-                displayName: 'Request serial access',
-            });
-        }
+        return ports;
+    };
+
+    const refreshPorts = async function() {
+        const ports = await buildWebPortOptions();
 
         self.updatePortSelect(ports);
         self.initialPorts = ports;
@@ -1647,8 +1656,9 @@ PortHandler.initializeWebSerial = function () {
         const currentValue = self.portPickerElement.val();
         if (currentValue && self.portPickerElement.children(`[value="${currentValue}"]`).length) {
             self.portPickerElement.val(currentValue);
-        } else if (ports.length) {
-            self.portPickerElement.val(ports[0].path);
+        } else {
+            const firstRealSerialPort = ports.find(port => port.path !== 'webserial' && !port.isDFU);
+            self.portPickerElement.val(firstRealSerialPort ? firstRealSerialPort.path : 'webserial');
         }
 
         self.portPickerElement.trigger('change');
@@ -1770,35 +1780,22 @@ PortHandler.check_usb_devices = function (callback) {
         chrome.usb.getDevices(usbDevices, function (result) {
             const selectedPath = self.portPickerElement.val();
             const hasMatchingDfuDevice = result.length > 0;
-            const serialPorts = serialWeb.ports ? [...serialWeb.ports] : [];
-            const ports = [...serialPorts];
-            ports.push({
-                path: 'DFU',
-                displayName: 'WebUSB DFU',
-                isDFU: true,
-                isWebUsb: true,
-            });
-
-            if (!ports.length && (typeof navigator !== 'undefined' && 'serial' in navigator)) {
-                ports.push({
-                    path: 'requestpermission-serial',
-                    displayName: 'Request serial access',
-                });
-            }
-
-            self.updatePortSelect(ports);
-            self.initialPorts = ports;
             self.dfu_available = hasMatchingDfuDevice;
+            buildWebPortOptions().then(ports => {
+                self.updatePortSelect(ports);
+                self.initialPorts = ports;
 
-            if (selectedPath && self.portPickerElement.children(`[value="${selectedPath}"]`).length) {
-                self.portPickerElement.val(selectedPath);
-            } else if (ports.length) {
-                self.portPickerElement.val(ports[0].path);
-            }
+                if (selectedPath && self.portPickerElement.children(`[value="${selectedPath}"]`).length) {
+                    self.portPickerElement.val(selectedPath);
+                } else {
+                    const firstRealSerialPort = ports.find(port => port.path !== 'webserial' && !port.isDFU);
+                    self.portPickerElement.val(firstRealSerialPort ? firstRealSerialPort.path : 'webserial');
+                }
 
-            if (callback) {
-                callback(self.dfu_available);
-            }
+                if (callback) {
+                    callback(self.dfu_available);
+                }
+            });
         });
         return;
     }
@@ -2018,6 +2015,7 @@ PortHandler.updatePortSelect = function (ports) {
                 isVirtual: !!ports[i].isVirtual,
                 isDFU: !!ports[i].isDFU,
                 isWebUsb: !!ports[i].isWebUsb,
+                isWebSerialLauncher: !!ports[i].isWebSerialLauncher,
             },
         }));
     }
@@ -9497,11 +9495,21 @@ function initializeSerialBackend() {
 
                         serial.connect('virtual', {}, onOpenVirtual);
                     } else if (isWeb()) {
-                        if (portName.startsWith('requestpermission-serial')) {
+                        if (selectedPortData.isWebSerialLauncher || portName === 'webserial') {
                             $$1('div#port-picker #port, div#port-picker #baud, div#port-picker #delay').prop('disabled', false);
                             $$1('div.connect_controls div.connect_state').text(i18n$1.getMessage('connect'));
                             GUI.connecting_to = false;
-                            await PortHandler$1.requestWebSerialPermission();
+                            const requestedPort = await PortHandler$1.requestWebSerialPermission();
+                            if (requestedPort?.path) {
+                                GUI.connecting_to = requestedPort.path;
+                                serial.removeEventListener('connect', connectHandler);
+                                serial.addEventListener('connect', connectHandler);
+
+                                serial.removeEventListener('disconnect', disconnectHandler);
+                                serial.addEventListener('disconnect', disconnectHandler);
+
+                                serial.connect(requestedPort.path, { baudRate });
+                            }
                             return;
                         }
 
